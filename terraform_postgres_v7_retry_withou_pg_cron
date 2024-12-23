@@ -1,0 +1,56 @@
+resource "null_resource" "configure_postgres" {
+  provisioner "local-exec" {
+    command = <<EOT
+      #!/bin/bash
+      set -e
+
+      # Função para verificar se o container está em execução
+      wait_for_container() {
+        local retries=5
+        local count=0
+        while ! docker inspect -f '{{.State.Running}}' ${var.container_name} | grep true; do
+          if [ $count -ge $retries ]; then
+            echo "Erro: O container ${var.container_name} não iniciou após $retries tentativas."
+            exit 1
+          fi
+          echo "Aguardando o container ${var.container_name} iniciar... Tentativa $((count + 1))/$retries"
+          count=$((count + 1))
+          sleep 5
+        done
+      }
+
+      # Função para executar um comando com retry
+      retry_command() {
+        local command="$1"
+        local retries=5
+        local count=0
+        while ! eval "$command"; do
+          if [ $count -ge $retries ]; then
+            echo "Erro: O comando falhou após $retries tentativas."
+            exit 1
+          fi
+          echo "Erro ao executar o comando. Tentativa $((count + 1))/$retries"
+          count=$((count + 1))
+          sleep 5
+        done
+      }
+
+      # Esperar pelo container
+      wait_for_container
+
+      # Adicionar configurações ao postgresql.conf
+      retry_command "docker exec -u postgres ${var.container_name} bash -c \"grep -q '# Terraform-configurations-start' /var/lib/postgresql/data/postgresql.conf || echo '# Terraform-configurations-start' >> /var/lib/postgresql/data/postgresql.conf\""
+
+      retry_command "docker exec -u postgres ${var.container_name} bash -c \"grep -q \\\"shared_preload_libraries = 'pg_stat_statements'\\\" /var/lib/postgresql/data/postgresql.conf || echo \\\"shared_preload_libraries = 'pg_stat_statements'\\\" >> /var/lib/postgresql/data/postgresql.conf\""
+
+      retry_command "docker exec -u postgres ${var.container_name} bash -c \"grep -q 'pg_stat_statements.max = 10000' /var/lib/postgresql/data/postgresql.conf || echo \\\"pg_stat_statements.max = 10000\\\" >> /var/lib/postgresql/data/postgresql.conf\""
+
+      retry_command "docker exec -u postgres ${var.container_name} bash -c \"grep -q 'pg_stat_statements.track = all' /var/lib/postgresql/data/postgresql.conf || echo \\\"pg_stat_statements.track = all\\\" >> /var/lib/postgresql/data/postgresql.conf\""
+
+      # Recarregar configurações e reiniciar o container
+      retry_command "docker restart ${var.container_name}"
+    EOT
+  }
+
+  depends_on = [var.container_name]
+}
