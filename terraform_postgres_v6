@@ -1,6 +1,6 @@
 terraform {
   required_version = ">= 0.12"
-}
+} 
 
 resource "null_resource" "configure_postgres" {
   provisioner "local-exec" {
