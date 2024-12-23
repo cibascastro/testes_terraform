@@ -1,0 +1,46 @@
+terraform {
+  required_version = ">= 0.12"
+}
+
+resource "null_resource" "configure_postgres" {
+  provisioner "local-exec" {
+    command = <<EOT
+      sleep 10
+      docker exec -u postgres ${var.container_name} bash -c "grep -q '# Terraform-configurations-start' /var/lib/postgresql/data/postgresql.conf || echo '# Terraform-configurations-start' >> /var/lib/postgresql/data/postgresql.conf"
+
+      # Configuracao shared_preload_libraries
+      docker exec -u postgres ${var.container_name} bash -c "grep -q \"shared_preload_libraries = 'pg_stat_statements, auto_explain'\" /var/lib/postgresql/data/postgresql.conf || echo \"shared_preload_libraries = 'pg_stat_statements, auto_explain'\" >> /var/lib/postgresql/data/postgresql.conf"
+
+      # Configuracoes do auto_explain
+      docker exec -u postgres ${var.container_name} bash -c "grep -q 'auto_explain.log_min_duration = 0' /var/lib/postgresql/data/postgresql.conf || echo \"auto_explain.log_min_duration = 0\" >> /var/lib/postgresql/data/postgresql.conf"
+      docker exec -u postgres ${var.container_name} bash -c "grep -q 'auto_explain.log_analyze = true' /var/lib/postgresql/data/postgresql.conf || echo \"auto_explain.log_analyze = true\" >> /var/lib/postgresql/data/postgresql.conf"
+     # docker exec -u postgres ${var.container_name} bash -c "grep -q 'auto_explain.log_buffers = true' /var/lib/postgresql/data/postgresql.conf || echo \"auto_explain.log_buffers = true\" >> /var/lib/postgresql/data/postgresql.conf"
+     # docker exec -u postgres ${var.container_name} bash -c "grep -q 'auto_explain.log_wal = true' /var/lib/postgresql/data/postgresql.conf || echo \"auto_explain.log_wal = true\" >> /var/lib/postgresql/data/postgresql.conf"
+     # docker exec -u postgres ${var.container_name} bash -c "grep -q 'auto_explain.log_timing = true' /var/lib/postgresql/data/postgresql.conf || echo \"auto_explain.log_timing = true\" >> /var/lib/postgresql/data/postgresql.conf"
+      docker exec -u postgres ${var.container_name} bash -c "grep -q \"auto_explain.log_format = 'json'\" /var/lib/postgresql/data/postgresql.conf || echo \"auto_explain.log_format = 'json'\" >> /var/lib/postgresql/data/postgresql.conf"
+
+      # Configuracao do diretorio e nome do arquivo de log
+      docker exec -u postgres ${var.container_name} bash -c "grep -q 'log_directory = "/var/lib/postgresql/data/pg_log/"' /var/lib/postgresql/data/postgresql.conf || echo \"log_directory = '/var/lib/postgresql/data/pg_log/'\" >> /var/lib/postgresql/data/postgresql.conf"
+      docker exec -u postgres ${var.container_name} bash -c "grep -q 'log_filename = "postgresql-%Y-%m-%d_%H%M%S.log"' /var/lib/postgresql/data/postgresql.conf || echo \"log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'\" >> /var/lib/postgresql/data/postgresql.conf"
+      docker exec -u postgres ${var.container_name} bash -c "grep -q 'log_destination = "stderr"' /var/lib/postgresql/data/postgresql.conf || echo \"log_destination = 'stderr'\" >> /var/lib/postgresql/data/postgresql.conf"
+
+      # Outras configuracoes úteis para logs
+      docker exec -u postgres ${var.container_name} bash -c "grep -q 'logging_collector = on' /var/lib/postgresql/data/postgresql.conf || echo \"logging_collector = on\" >> /var/lib/postgresql/data/postgresql.conf"
+      docker exec -u postgres ${var.container_name} bash -c "grep -q 'log_statement = "all"' /var/lib/postgresql/data/postgresql.conf || echo \"log_statement = 'all'\" >> /var/lib/postgresql/data/postgresql.conf"
+      docker exec -u postgres ${var.container_name} bash -c "grep -q 'log_duration = on' /var/lib/postgresql/data/postgresql.conf || echo \"log_duration = on\" >> /var/lib/postgresql/data/postgresql.conf"
+      docker exec -u postgres ${var.container_name} bash -c "grep -q 'log_min_duration_statement = 1000' /var/lib/postgresql/data/postgresql.conf || echo \"log_min_duration_statement = 1000\" >> /var/lib/postgresql/data/postgresql.conf"
+
+      # Outras configuracoes do pg_stat_statements
+      docker exec -u postgres ${var.container_name} bash -c "grep -q 'pg_stat_statements.max = 10000' /var/lib/postgresql/data/postgresql.conf || echo \"pg_stat_statements.max = 10000\" >> /var/lib/postgresql/data/postgresql.conf"
+      docker exec -u postgres ${var.container_name} bash -c "grep -q 'pg_stat_statements.track = all' /var/lib/postgresql/data/postgresql.conf || echo \"pg_stat_statements.track = all\" >> /var/lib/postgresql/data/postgresql.conf"
+
+      # Recarregar as configuracoes do PostgreSQL
+      sleep 10 
+      # docker exec -u postgres ${var.container_name} bash -c "pg_ctl reload -D /var/lib/postgresql/data"
+      # Reiniciar o container Docker PostgreSQL
+      docker restart ${var.container_name}
+    EOT
+  }
+
+  depends_on = [var.container_name]
+}
