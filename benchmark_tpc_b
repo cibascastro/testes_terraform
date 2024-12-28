@@ -1,0 +1,73 @@
+-- Configuração inicial: criar tabelas e popular com dados
+DO $$
+BEGIN
+    -- Criar tabela de contas
+    CREATE TABLE IF NOT EXISTS accounts (
+        id SERIAL PRIMARY KEY,
+        balance NUMERIC(12, 2) NOT NULL DEFAULT 0,
+        branch_id INT NOT NULL
+    );
+
+    -- Criar tabela de transações
+    CREATE TABLE IF NOT EXISTS transactions (
+        id SERIAL PRIMARY KEY,
+        account_id INT NOT NULL REFERENCES accounts(id),
+        amount NUMERIC(12, 2) NOT NULL,
+        timestamp TIMESTAMP DEFAULT now()
+    );
+
+    -- Criar tabela de agências
+    CREATE TABLE IF NOT EXISTS branches (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL
+    );
+
+    -- Popular tabelas com dados iniciais
+    INSERT INTO branches (name) 
+    SELECT 'Branch ' || i FROM generate_series(1, 10) i
+    ON CONFLICT DO NOTHING;
+
+    INSERT INTO accounts (balance, branch_id)
+    SELECT trunc(random() * 10000), trunc(random() * 10 + 1)
+    FROM generate_series(1, 100000) g
+    ON CONFLICT DO NOTHING;
+END $$;
+
+-- Função para executar transações simuladas
+CREATE OR REPLACE FUNCTION benchmark_transactions(iterations INT) RETURNS VOID AS $$
+DECLARE
+    i INT;
+    acc_id INT;
+    amt NUMERIC(12, 2);
+    start_time TIMESTAMP;
+    end_time TIMESTAMP;
+BEGIN
+    start_time := clock_timestamp();
+
+    FOR i IN 1..iterations LOOP
+        -- Escolher uma conta aleatória
+        acc_id := (SELECT id FROM accounts ORDER BY random() LIMIT 1);
+
+        -- Determinar um valor aleatório de transação
+        amt := (random() * 2000 - 1000)::NUMERIC(12, 2);
+
+        -- Atualizar saldo da conta
+        UPDATE accounts
+        SET balance = balance + amt
+        WHERE id = acc_id;
+
+        -- Registrar a transação
+        INSERT INTO transactions (account_id, amount) 
+        VALUES (acc_id, amt);
+    END LOOP;
+
+    end_time := clock_timestamp();
+    RAISE NOTICE 'Execução concluída em % segundos.', EXTRACT(SECOND FROM (end_time - start_time));
+END $$ LANGUAGE plpgsql;
+
+-- Executar o benchmark
+DO $$
+BEGIN
+    -- Número de transações para o benchmark
+    PERFORM benchmark_transactions(10000);
+END $$;
