@@ -1,0 +1,36 @@
+/*
+Script SQL para identificar as queries mais consumidoras no PostgreSQL usando a visão de sistema pg_stat_statements. 
+O script ordena as queries com base em métricas como tempo total de execução, número de chamadas ou consumo de I/O.
+*/
+
+WITH top_queries AS (
+SELECT 
+        queryid,
+        query,
+        calls,
+        total_exec_time AS exec_time_total,
+        (total_exec_time / NULLIF(calls, 0)) AS exec_time_avg,
+        rows,
+        shared_blks_hit,
+        shared_blks_read,
+        shared_blks_dirtied,
+        shared_blks_written
+FROM public.pg_stat_statements_log
+    ORDER BY
+        total_exec_time DESC
+    LIMIT 10
+)
+SELECT
+    row_number() OVER () AS rank,
+    queryid,
+    query,
+    calls,
+    exec_time_total,
+    exec_time_avg,
+    rows,
+    shared_blks_hit,
+    shared_blks_read,
+    shared_blks_dirtied,
+    shared_blks_written
+FROM
+    top_queries;
