@@ -1,0 +1,37 @@
+SELECT table_name
+FROM information_schema.tables
+WHERE table_schema = 'public'
+AND table_type = 'BASE TABLE';
+
+
+SELECT 
+    md5(query) AS query_hash, query, *
+FROM pg_stat_statements_log 
+order by md5(query); 
+
+SELECT 
+    md5(query) AS query_hash, count(*)
+FROM pg_stat_statements_log 
+group by md5(query) 
+order by md5(query); 
+
+
+-- adicionando coluna calculada
+
+alter table pg_stat_statements_log
+add column query_hash CHAR(32) generated always as (md5(query)) stored;
+
+
+SELECT 
+    query_hash, query, *
+FROM pg_stat_statements_log 
+order by query_hash; 
+
+
+SELECT 
+    query_hash, count(*)
+FROM pg_stat_statements_log 
+group by query_hash
+order by 2 desc; 
+
+
