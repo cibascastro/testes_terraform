@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sql-runner
+spec:
+  replicas: 10  # Número de pods que serão criados
+  selector:
+    matchLabels:
+      app: sql-runner
+  template:
+    metadata:
+      labels:
+        app: sql-runner
+    spec:
+      containers:
+        - name: sql-runner
+          image: mcr.microsoft.com/mssql-tools  # Usa apenas a CLI do SQL Server
+          command: ["/bin/sh", "-c"]
+          args:
+            - /opt/mssql-tools/bin/sqlcmd -S 192.168.100.3 -U rocibca -P "rocibca" -d dbs600 -i /scripts/script.sql
+          volumeMounts:
+            - name: sql-script-volume
+              mountPath: /scripts
+      volumes:
+        - name: sql-script-volume
+          configMap:
+            name: sql-script
